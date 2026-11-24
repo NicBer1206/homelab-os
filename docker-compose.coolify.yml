@@ -19,7 +19,10 @@ services:
     volumes:
       - backend_data:/app/data
     networks:
-      - homelable
+      homelable:
+      monitoring:
+        aliases:
+          - homelab-os-backend
     cap_add:
       - NET_RAW
     healthcheck:
@@ -59,7 +62,10 @@ services:
       backend:
         condition: service_healthy
     networks:
-      - homelable
+      homelable:
+      monitoring:
+        aliases:
+          - homelab-os-frontend
 
 volumes:
   backend_data:
@@ -67,3 +73,6 @@ volumes:
 networks:
   homelable:
     driver: bridge
+  monitoring:
+    external: true
+    name: homelab-monitoring
