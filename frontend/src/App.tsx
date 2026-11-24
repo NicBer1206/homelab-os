@@ -75,7 +75,7 @@ import type { ZwaveNode, ZwaveEdge } from '@/components/zwave/types'
 import type { ProxmoxNode, ProxmoxEdge, ProxmoxCanvasMode } from '@/components/proxmox/types'
 import type { UnraidNode, UnraidEdge } from '@/components/unraid/types'
 import { buildProxmoxClusterEdges } from '@/components/proxmox/clusterEdges'
-import { groupProxmoxGuests, layoutProxmoxContainers, measureProxmoxContainers } from '@/utils/proxmoxContainerLayout'
+import { layoutProxmoxImport, resolveProxmoxImport } from '@/utils/proxmox-guest-nesting'
 
 const STANDALONE = import.meta.env.VITE_STANDALONE === 'true'
 
@@ -999,107 +999,89 @@ export default function App() {
   const handleProxmoxAddToCanvas = useCallback((
     pmNodes: ProxmoxNode[],
     pmEdges: ProxmoxEdge[],
-    mode: ProxmoxCanvasMode = 'linked',
+    mode: ProxmoxCanvasMode = 'container',
   ) => {
+    if (!pmNodes.length) return
     snapshotHistory()
-    const COLS = 4
-    const SPACING_X = 190
-    const SPACING_Y = 110
-    // Multiple hosts from one import = a cluster → chain them via left/right
-    // 'cluster' edges. Those endpoints need one left + one right handle each
-    // (both default to 0), so grant them to the host nodes up front.
+    const existing = useCanvasStore.getState().nodes
+    const resolved = resolveProxmoxImport(pmNodes, pmEdges, existing)
     const clusterEdges = buildProxmoxClusterEdges(pmNodes)
-    const cluster = clusterEdges.length > 0
 
-    // Container mode: each host becomes a box and its guests are nested inside
-    // it. Anything the import gives no host for stays a loose node below.
-    const { hostIds, childrenByHost, hostOfChild, looseIds } = groupProxmoxGuests(pmNodes, pmEdges)
-    const hostIdSet = new Set(hostIds)
-
-    let placement: Record<string, { x: number; y: number }>
-    let hostSizes: Record<string, { width: number; height: number }> = {}
-    if (mode === 'container') {
-      const measured = measureProxmoxContainers(hostIds, childrenByHost, looseIds.length)
-      const origin = getCenteredPosition(measured.width, measured.height)
-      const laid = layoutProxmoxContainers(hostIds, childrenByHost, looseIds, origin)
-      placement = laid.positions
-      hostSizes = laid.hostSizes
-    } else {
-      const cols = Math.min(COLS, pmNodes.length)
-      const rows = Math.ceil(pmNodes.length / COLS)
-      const origin = getCenteredPosition(cols * SPACING_X, rows * SPACING_Y)
-      placement = {}
-      pmNodes.forEach((pn, i) => {
-        placement[pn.id] = {
-          x: origin.x + (i % COLS) * SPACING_X,
-          y: origin.y + Math.floor(i / COLS) * SPACING_Y,
+    if (clusterEdges.length) {
+      for (const node of resolved.nodes.values()) {
+        if (node.data.type === 'proxmox') {
+          node.data.left_handles = Math.max(1, node.data.left_handles ?? 0)
+          node.data.right_handles = Math.max(1, node.data.right_handles ?? 0)
         }
-      })
+      }
     }
 
-    // Hosts first: addNode resolves `data.parent_id` against the nodes already
-    // in the store, so a guest added before its container would not nest.
-    const ordered = mode === 'container'
-      ? [...pmNodes.filter((n) => hostIdSet.has(n.id)), ...pmNodes.filter((n) => !hostIdSet.has(n.id))]
-      : pmNodes
-    ordered.forEach((pn) => {
-      const position = placement[pn.id] ?? getCenteredPosition()
-      const isClusterHost = cluster && pn.type === 'proxmox'
-      const isContainerHost = mode === 'container' && hostIdSet.has(pn.id)
-      const parentId = mode === 'container' ? hostOfChild[pn.id] : undefined
-      const size = hostSizes[pn.id]
-      const newNode: import('@xyflow/react').Node<NodeData> = {
-        id: pn.id,
-        type: pn.type,
-        position,
-        ...(isContainerHost && size ? { width: size.width, height: size.height } : {}),
-        data: {
-          label: pn.label,
-          type: pn.type as NodeData['type'],
-          status: (pn.status === 'online' ? 'online' : 'unknown') as NodeData['status'],
-          services: [],
-          // Same as the Zigbee import: the row exists already, point at it.
-          ...(pn.device_id ? { device_id: pn.device_id } : {}),
-          ...(pn.ip ? { ip: pn.ip } : {}),
-          ...(pn.hostname ? { hostname: pn.hostname } : {}),
-          ...(isClusterHost ? { left_handles: 1, right_handles: 1 } : {}),
-          ...(isContainerHost ? { container_mode: true } : {}),
-          ...(parentId ? { parent_id: parentId } : {}),
-        },
+    if (mode === 'container') {
+      const layout = layoutProxmoxImport(resolved, existing, getCenteredPosition)
+      layout.nodes.forEach(addNode)
+      if (layout.emptySectionId) useCanvasStore.getState().deleteNode(layout.emptySectionId)
+
+      // Clean up previously imported virtual links when the cards become nested.
+      useCanvasStore.setState((state) => ({
+        edges: state.edges.filter((edge) => edge.type !== 'virtual'
+          || resolved.parentByGuest.get(edge.target) !== edge.source),
+      }))
+    } else {
+      const cols = Math.min(4, resolved.nodes.size)
+      const rows = Math.ceil(resolved.nodes.size / cols)
+      const origin = getCenteredPosition(cols * 190, rows * 110)
+      const existingIds = new Set(existing.map((node) => node.id))
+      let index = 0
+      for (const node of resolved.nodes.values()) {
+        if (!existingIds.has(node.id)) {
+          node.position = { x: origin.x + (index % cols) * 190, y: origin.y + Math.floor(index / cols) * 110 }
+          index += 1
+          addNode(node)
+        } else {
+          updateNode(node.id, {
+            status: node.data.status,
+            device_id: node.data.device_id,
+            ip: node.data.ip,
+            hostname: node.data.hostname,
+            ...(clusterEdges.length && node.data.type === 'proxmox' ? {
+              left_handles: node.data.left_handles,
+              right_handles: node.data.right_handles,
+            } : {}),
+          })
+        }
       }
-      addNode(newNode)
-    })
-    // Host → guest links render as 'virtual' edges (VM/LXC ↔ host). A nested
-    // guest gets none: sitting inside the host already says it runs there, and
-    // the edge just loops out of the box and back (#399 follow-up).
-    pmEdges.forEach((pe) => {
-      if (hostOfChild[pe.target] === pe.source && mode === 'container') return
-      onConnect({
-        source: pe.source,
-        sourceHandle: 'bottom',
-        target: pe.target,
-        targetHandle: 'top-t',
-        type: 'virtual',
-      } as unknown as import('@xyflow/react').Connection)
-    })
-    // Host ↔ host links render as 'cluster' edges (left → right chain).
-    clusterEdges.forEach((ce) => {
-      onConnect({
-        source: ce.source,
-        sourceHandle: ce.sourceHandle,
-        target: ce.target,
-        targetHandle: ce.targetHandle,
-        type: 'cluster',
-      } as unknown as import('@xyflow/react').Connection)
-    })
-    const importedIds = new Set(pmNodes.map((pn) => pn.id))
+    }
+
+    const connectOnce = (
+      source: string, target: string, sourceHandle: string, targetHandle: string, type: 'virtual' | 'cluster',
+    ) => {
+      if (useCanvasStore.getState().edges.some((edge) =>
+        edge.source === source && edge.target === target && edge.type === type
+        && edge.sourceHandle === sourceHandle && edge.targetHandle === targetHandle,
+      )) return
+      onConnect({ source, target, sourceHandle, targetHandle, type } as import('@xyflow/react').Connection)
+    }
+    if (mode === 'linked') {
+      for (const edge of pmEdges) {
+        const source = resolved.ids.get(edge.source)
+        const target = resolved.ids.get(edge.target)
+        if (source && target && resolved.nodes.get(target)?.parentId !== source) {
+          connectOnce(source, target, 'bottom', 'top-t', 'virtual')
+        }
+      }
+    }
+    for (const edge of clusterEdges) {
+      connectOnce(resolved.ids.get(edge.source)!, resolved.ids.get(edge.target)!, edge.sourceHandle, edge.targetHandle, 'cluster')
+    }
+
+    const importedIds = resolved.nodes
     useCanvasStore.setState((state) => ({
       nodes: state.nodes.map((n) => ({ ...n, selected: importedIds.has(n.id) })),
-      selectedNodeIds: Array.from(importedIds),
-      selectedNodeId: importedIds.size === 1 ? Array.from(importedIds)[0] : null,
+      selectedNodeIds: [...importedIds.keys()],
+      selectedNodeId: importedIds.size === 1 ? importedIds.keys().next().value ?? null : null,
     }))
     markUnsaved()
-  }, [addNode, onConnect, snapshotHistory, markUnsaved])
+  }, [addNode, onConnect, snapshotHistory, markUnsaved, updateNode])
 
   const handleUnraidAddToCanvas = useCallback((urNodes: UnraidNode[], urEdges: UnraidEdge[]) => {
     snapshotHistory()

@@ -26,6 +26,22 @@ describe('canvasStore — containers & nesting', () => {
     resetStore()
   })
 
+  it('keeps a replaced nested container before its children', () => {
+    const { addNode } = useCanvasStore.getState()
+    addNode(makeNode('host', { type: 'proxmox', container_mode: true }))
+    const guest = makeNode('guest', { type: 'vm', container_mode: true, parent_id: 'host' })
+    addNode(guest)
+    addNode(makeNode('workload', { type: 'docker_container', parent_id: 'guest' }))
+
+    addNode(guest)
+
+    expect(useCanvasStore.getState().nodes.map(({ id, parentId }) => [id, parentId])).toEqual([
+      ['host', undefined],
+      ['guest', 'host'],
+      ['workload', 'guest'],
+    ])
+  })
+
   it('addNode nests under parent only when parent is in container mode', () => {
     const parent = { ...makeNode('p1', { container_mode: false }), position: { x: 100, y: 100 } }
     const child = { ...makeNode('c1', { parent_id: 'p1' }), position: { x: 150, y: 180 } }

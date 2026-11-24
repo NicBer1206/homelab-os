@@ -1,9 +1,9 @@
-import { createElement, useEffect } from 'react'
+import { useEffect } from 'react'
 import { NodeResizer, useUpdateNodeInternals, type NodeProps, type Node } from '@xyflow/react'
 import { Layers } from 'lucide-react'
 import type { NodeData } from '@/types'
 import { resolveNodeColors } from '@/utils/nodeColors'
-import { resolveNodeIcon, isImageIconKey } from '@/utils/nodeIcons'
+import { NODE_TYPE_DEFAULT_BRAND_ICONS } from '@/utils/nodeIcons'
 import { NodeIcon } from '@/components/ui/NodeIcon'
 import { resolvePropertyIcon } from '@/utils/propertyIcons'
 import { useCanvasStore } from '@/stores/canvasStore'
@@ -23,11 +23,6 @@ export function ProxmoxGroupNode(props: NodeProps<Node<NodeData>>) {
   const theme = THEMES[activeTheme]
   const colors = resolveNodeColors(data, activeTheme)
 
-  // Container mode is opt-in — a proxmox node renders as a regular card unless
-  // it is explicitly a container (matches the rest of the codebase, which gates
-  // nesting on `container_mode === true`; see App.tsx). Imported nodes leave the
-  // flag unset and so render like a manually-created proxmox node. Cluster links
-  // use the configurable per-side connection points (see BaseNode / SideHandles).
   if (data.container_mode !== true) {
     return <BaseNode {...props} icon={Layers} />
   }
@@ -35,7 +30,6 @@ export function ProxmoxGroupNode(props: NodeProps<Node<NodeData>>) {
   const statusColor = theme.colors.statusColors[data.status]
   const isOnline = data.status === 'online'
   const glow = colors.border
-  const resolvedIcon = resolveNodeIcon(Layers, data.custom_icon)
 
   return (
     <>
@@ -75,9 +69,11 @@ export function ProxmoxGroupNode(props: NodeProps<Node<NodeData>>) {
               background: theme.colors.nodeIconBackground,
             }}
           >
-            {isImageIconKey(data.custom_icon)
-              ? <NodeIcon typeIcon={Layers} customIconKey={data.custom_icon} size={12} />
-              : createElement(resolvedIcon, { size: 12 })}
+            <NodeIcon
+              typeIcon={Layers}
+              customIconKey={data.custom_icon ?? NODE_TYPE_DEFAULT_BRAND_ICONS.proxmox}
+              size={12}
+            />
           </div>
           <div className="flex flex-col min-w-0 flex-1">
             <span

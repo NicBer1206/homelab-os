@@ -62,9 +62,7 @@ export function ProxmoxImportModal({ open, onClose, onAddToCanvas, onInventoryIm
   const [edges, setEdges] = useState<ProxmoxEdge[]>([])
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [importMode, setImportMode] = useState<ImportMode>('pending')
-  // Opt-in: draw each host as a box holding its guests instead of laying them
-  // out side by side and joining them with 'virtual' edges.
-  const [canvasMode, setCanvasMode] = useState<ProxmoxCanvasMode>('linked')
+  const [canvasMode, setCanvasMode] = useState<ProxmoxCanvasMode>('container')
 
   const updateField = (field: keyof ConnectionForm, value: string) =>
     setForm((f) => ({ ...f, [field]: value }))
@@ -151,7 +149,7 @@ export function ProxmoxImportModal({ open, onClose, onAddToCanvas, onInventoryIm
     setConnectionStatus('idle')
     setConnectionMsg('')
     setImportMode('pending')
-    setCanvasMode('linked')
+    setCanvasMode('container')
     onClose()
   }
 

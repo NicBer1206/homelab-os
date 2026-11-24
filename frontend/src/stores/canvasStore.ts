@@ -627,6 +627,9 @@ export const useCanvasStore = create<CanvasState>((rawSet, get) => {
         : { ...node, parentId: undefined, extent: undefined }
       // Parents must come before children in the array (React Flow requirement)
       const withoutNew = state.nodes.filter((n) => n.id !== node.id)
+      if (withoutNew.some((n) => n.parentId === enriched.id)) {
+        return { nodes: orderParentsFirst([...withoutNew, enriched]), hasUnsavedChanges: true }
+      }
       if (enriched.parentId) {
         const parentIdx = withoutNew.findIndex((n) => n.id === enriched.parentId)
         const insertAt = parentIdx >= 0 ? parentIdx + 1 : withoutNew.length

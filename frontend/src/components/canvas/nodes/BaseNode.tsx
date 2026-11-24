@@ -1,9 +1,9 @@
-import { createElement, useEffect, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { NodeResizer, useUpdateNodeInternals, useViewport, type NodeProps, type Node } from '@xyflow/react'
 import { Cpu, MemoryStick, HardDrive, ExternalLink, type LucideIcon } from 'lucide-react'
 import type { NodeData } from '@/types'
 import { resolveNodeColors } from '@/utils/nodeColors'
-import { resolveNodeIcon, isImageIconKey } from '@/utils/nodeIcons'
+import { NODE_TYPE_DEFAULT_BRAND_ICONS } from '@/utils/nodeIcons'
 import { NodeIcon } from '@/components/ui/NodeIcon'
 import { ServiceIcon } from '@/components/ui/ServiceIcon'
 import { resolvePropertyIcon } from '@/utils/propertyIcons'
@@ -36,7 +36,6 @@ export function BaseNode({ id, data, selected, icon: typeIcon, width, height }: 
   const serviceStatuses = useCanvasStore((s) => s.serviceStatuses)
   const theme = THEMES[activeTheme]
 
-  const resolvedIcon = resolveNodeIcon(typeIcon, data.custom_icon)
   const colors = resolveNodeColors(data, activeTheme)
   const statusColor = theme.colors.statusColors[data.status]
   const isOnline = data.status === 'online'
@@ -112,9 +111,11 @@ export function BaseNode({ id, data, selected, icon: typeIcon, width, height }: 
             background: theme.colors.nodeIconBackground,
           }}
         >
-          {isImageIconKey(data.custom_icon)
-            ? <NodeIcon typeIcon={typeIcon} customIconKey={data.custom_icon} size={15} />
-            : createElement(resolvedIcon, { size: 15 })}
+          <NodeIcon
+            typeIcon={typeIcon}
+            customIconKey={data.custom_icon ?? NODE_TYPE_DEFAULT_BRAND_ICONS[data.type]}
+            size={15}
+          />
         </div>
 
         {/* Label + IP */}

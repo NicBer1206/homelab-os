@@ -111,7 +111,7 @@ describe('ProxmoxImportModal', () => {
     expect(screen.getByRole('checkbox', { name: /nest guests inside their host/i })).toBeDefined()
   })
 
-  it("adds to canvas in 'linked' mode by default", async () => {
+  it("adds to canvas in 'container' mode by default", async () => {
     vi.mocked(proxmoxApi.importNetwork).mockResolvedValue({
       data: { nodes: sampleNodes, edges: [{ source: 'pve-node-pve1', target: 'pve-pve1-101' }], device_count: 2 },
     } as never)
@@ -122,11 +122,11 @@ describe('ProxmoxImportModal', () => {
     await waitFor(() => expect(screen.getByText('pve1')).toBeDefined())
     fireEvent.click(screen.getByRole('button', { name: /add 2 to canvas/i }))
     expect(defaultProps.onAddToCanvas).toHaveBeenCalledWith(
-      expect.any(Array), expect.any(Array), 'linked',
+      expect.any(Array), expect.any(Array), 'container',
     )
   })
 
-  it("passes 'container' when the nest option is ticked", async () => {
+  it("passes 'linked' when the nest option is unticked", async () => {
     vi.mocked(proxmoxApi.importNetwork).mockResolvedValue({
       data: { nodes: sampleNodes, edges: [{ source: 'pve-node-pve1', target: 'pve-pve1-101' }], device_count: 2 },
     } as never)
@@ -138,7 +138,7 @@ describe('ProxmoxImportModal', () => {
     await waitFor(() => expect(screen.getByText('pve1')).toBeDefined())
     fireEvent.click(screen.getByRole('button', { name: /add 2 to canvas/i }))
     const [nodes, edges, mode] = vi.mocked(defaultProps.onAddToCanvas).mock.calls[0]
-    expect(mode).toBe('container')
+    expect(mode).toBe('linked')
     expect(nodes).toHaveLength(2)
     expect(edges).toHaveLength(1)
   })

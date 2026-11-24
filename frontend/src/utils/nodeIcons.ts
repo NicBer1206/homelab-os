@@ -152,6 +152,10 @@ export const ICON_REGISTRY: IconEntry[] = [
   { key: 'phone',   label: 'VoIP / FreePBX',      category: 'Communications', icon: Phone },
 ]
 
+export const NODE_TYPE_DEFAULT_BRAND_ICONS: Partial<Record<NodeType, string>> = {
+  proxmox: 'brand:proxmox',
+}
+
 export const ICON_CATEGORIES = [...new Set(ICON_REGISTRY.map((e) => e.category))]
 
 export const ICON_MAP: Record<string, LucideIcon> = Object.fromEntries(
@@ -165,7 +169,7 @@ export const NODE_TYPE_DEFAULT_ICONS: Record<NodeType, LucideIcon> = {
   switch:           Network,
   server:           Server,
   proxmox:          Layers,
-  vm:               Box,
+  vm:               Monitor,
   lxc:              Container,
   nas:              HardDrive,
   kvm:              MonitorCog,
