@@ -16,6 +16,13 @@ services:
       SCANNER_HTTP_PROBE_ENABLED: "false"
       STATUS_CHECKER_ENABLED: "false"
       MCP_SERVICE_KEY: ${MCP_SERVICE_KEY:?Required}
+      PROXMOX_HOST: ${PROXMOX_HOST:-}
+      PROXMOX_PORT: ${PROXMOX_PORT:-8006}
+      PROXMOX_TOKEN_ID: ${PROXMOX_TOKEN_ID:-}
+      PROXMOX_TOKEN_SECRET: ${PROXMOX_TOKEN_SECRET:-}
+      PROXMOX_VERIFY_TLS: "true"
+      PROXMOX_SYNC_ENABLED: "false"
+      PROXMOX_SYNC_INTERVAL: "3600"
     volumes:
       - backend_data:/app/data
     networks:
