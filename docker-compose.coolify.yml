@@ -1,0 +1,67 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?Required}
+      SQLITE_PATH: /app/data/homelab.db
+      CORS_ORIGINS: ${CORS_ORIGINS:?Required}
+      AUTH_MODE: local
+      AUTH_USERNAME: ${AUTH_USERNAME:-admin}
+      AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH:?Required}
+      ACCESS_TOKEN_EXPIRE_MINUTES: 480
+      SCANNER_RANGES: '["192.168.0.0/24"]'
+      SCANNER_HTTP_PROBE_ENABLED: "false"
+      STATUS_CHECKER_ENABLED: "false"
+      MCP_SERVICE_KEY: ${MCP_SERVICE_KEY:?Required}
+    volumes:
+      - backend_data:/app/data
+    networks:
+      - homelable
+    cap_add:
+      - NET_RAW
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  mcp:
+    build:
+      context: ./mcp
+      dockerfile: Dockerfile.mcp
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:8000
+      MCP_API_KEY: ${MCP_API_KEY:?Required}
+      MCP_SERVICE_KEY: ${MCP_SERVICE_KEY:?Required}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - homelable
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_BASE_PATH: /
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - homelable
+
+volumes:
+  backend_data:
+
+networks:
+  homelable:
+    driver: bridge
